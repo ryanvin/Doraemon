@@ -15,7 +15,7 @@
 
             socket.on('log', function(msg) {
                 $('#log').text(msg.level + ': ' + msg.text);
-            })
+            });
 
             var ping_pong_times = [];
             var start_time;

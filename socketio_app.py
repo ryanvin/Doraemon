@@ -11,15 +11,15 @@ tickers = ['abc_usdt', 'def_usdt', 'ghi_btc']
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'fashdoi03whioealsd0q9ef0'
 sio = SocketIO(app)
-sio.init_app(app, async_mode='eventlet')
+sio.init_app(app, async_mode='eventlet', message_queue='redis://127.0.0.1:6379')
 rooms = ('okex', 'huobi', 'binance')
 
 
 def timer_ticker(sio):
-    def generate_ticker(room):
+    def generate_ticker(roomi):
         tick = random.choice(tickers)
         sio.emit('ticker_response', {'data': '{}: {}'.format(tick, random.random()), 'room': room},
-                 namespace='/ticker', room=room)
+                 namespace='/ticker', room=roomi)
 
     for room in rooms:
         generate_ticker(room)
