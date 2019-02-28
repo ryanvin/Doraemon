@@ -4,6 +4,8 @@ import time
 import random
 from threading import Timer
 import eventlet
+from redis import StrictRedis
+from collections import defaultdict
 
 eventlet.monkey_patch(socket=True)
 tickers = ['abc_usdt', 'def_usdt', 'ghi_btc']
@@ -13,6 +15,9 @@ app.config['SECRET_KEY'] = 'fashdoi03whioealsd0q9ef0'
 sio = SocketIO(app)
 sio.init_app(app, async_mode='eventlet', message_queue='redis://127.0.0.1:6379')
 rooms = ('okex', 'huobi', 'binance')
+sock_clients = dict()
+rds = StrictRedis.from_url('redis://127.0.0.1:6379')
+user_rooms = defaultdict(list)
 
 
 def timer_ticker(sio):
@@ -47,13 +52,17 @@ def on_room(data):
         emit('log', {'level': 'error', 'text': 'room [{}] not found'.format(data['room'])})
     else:
         join_room(data['room'])
-        emit('log', {'level': 'info', 'text': 'join room [{}]'.format(data['room'])})
+        user_rooms[request.sid].append(data['room'])
+        emit('log',
+             {'level': 'info', 'text': 'join room [{}], rooms now: {}'.format(data['room'], user_rooms[request.sid])})
 
 
 @sio.on('leave', namespace='/ticker')
 def off_room(data):
     leave_room(data['room'])
-    emit('log', {'level': 'info', 'text': 'leave room [{}]'.format(data['room'])})
+    user_rooms[request.sid].remove(data['room'])
+    emit('log',
+         {'level': 'info', 'text': 'leave room [{}], rooms now: {}'.format(data['room'], user_rooms[request.sid])})
 
 
 if __name__ == '__main__':

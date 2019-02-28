@@ -10,7 +10,8 @@
             var socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port + namespace);
 
             socket.on('ticker_response', function(msg) {
-                $('#ticker').text(msg.room + ': ' + msg.data);
+                msg_text = msg.room + ': ' + msg.data
+                $('#tickers').append('<p>Ticker: ' + msg_text + '</p>')
             });
 
             socket.on('log', function(msg) {
@@ -51,6 +52,7 @@
 
 
 
+
     </script>
 </head>
 <body>
@@ -67,8 +69,8 @@
     <input type="submit" value="Leave Room">
 </form>
 <h2>Receive:</h2>
-<div>
-    <p>Ticker: <span id="ticker"></span></p>
+<div id="tickers">
+
 </div>
 </body>
 </html>

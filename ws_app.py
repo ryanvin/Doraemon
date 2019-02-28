@@ -11,14 +11,14 @@ def ping(server):
     while True:
         for cid, client in clients.items():
             server.send_message(client, 'ping to [{}]: {}'.format(cid, time.time()))
-        time.sleep(2)
+        time.sleep(0.3)
 
 
 def ticker(server):
     while True:
         for _, client in ticker_clients.items():
             server.send_message(client, 'abc_usdt: {}'.format(random.random()))
-        time.sleep(3)
+        time.sleep(0.1)
 
 
 def new_client(client, server):
@@ -29,13 +29,14 @@ def new_client(client, server):
 
 def drop_client(client, server):
     clients.pop(client['id'])
+    ticker_clients.pop(client['id'])
     print('{} clients in all'.format(len(clients)))
 
 
 def on_message(client, server, message):
     if message == 'ticker' and client['id'] in clients:
         ticker_clients.setdefault(client['id'], client)
-    if message == 'cancel_ticker' and client['id'] in clients:
+    if message == 'cancel_ticker' and client['id'] in ticker_clients:
         ticker_clients.pop(client['id'])
 
 
