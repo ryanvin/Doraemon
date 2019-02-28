@@ -1,11 +1,12 @@
+import json
+import time
+from collections import defaultdict
+from threading import Thread
+
+import eventlet
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
-import time
-import random
-from threading import Timer
-import eventlet
 from redis import StrictRedis
-from collections import defaultdict
 
 eventlet.monkey_patch(socket=True)
 tickers = ['abc_usdt', 'def_usdt', 'ghi_btc']
@@ -14,21 +15,27 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'fashdoi03whioealsd0q9ef0'
 sio = SocketIO(app)
 sio.init_app(app, async_mode='eventlet', message_queue='redis://127.0.0.1:6379')
-rooms = ('okex', 'huobi', 'binance')
+subscribed_rooms = defaultdict(int)
+valid_rooms = ('okex', 'huobi', 'binance')
 sock_clients = dict()
 rds = StrictRedis.from_url('redis://127.0.0.1:6379')
-user_rooms = defaultdict(list)
+user_rooms = defaultdict(set)
 
 
-def timer_ticker(sio):
-    def generate_ticker(roomi):
-        tick = random.choice(tickers)
-        sio.emit('ticker_response', {'data': '{}: {}'.format(tick, random.random()), 'room': room},
-                 namespace='/ticker', room=roomi)
-
-    for room in rooms:
-        generate_ticker(room)
-    Timer(2, timer_ticker, [sio]).start()
+def subscribe_push(sock):
+    global subscribed_rooms
+    r = rds.pubsub()
+    r.subscribe('ticker_update')
+    while True:
+        message = r.get_message(ignore_subscribe_messages=True)
+        if not message:
+            time.sleep(0.1)
+            continue
+        data = json.loads(message['data'], encoding='utf-8')
+        r_count = subscribed_rooms.copy().get(data['room'])
+        if r_count and r_count > 0:
+            sock.emit('ticker_response',
+                      {'data': data['payload'], 'room': data['room']}, room=data['room'], namespace='/ticker')
 
 
 @app.route('/')
@@ -48,23 +55,30 @@ def on_ping(_):
 
 @sio.on('join', namespace='/ticker')
 def on_room(data):
-    if data['room'] not in rooms:
+    global subscribed_rooms
+    if data['room'] not in valid_rooms:
         emit('log', {'level': 'error', 'text': 'room [{}] not found'.format(data['room'])})
     else:
         join_room(data['room'])
-        user_rooms[request.sid].append(data['room'])
+        user_rooms[request.sid].add(data['room'])
+        subscribed_rooms[data['room']] += 1
         emit('log',
              {'level': 'info', 'text': 'join room [{}], rooms now: {}'.format(data['room'], user_rooms[request.sid])})
 
 
 @sio.on('leave', namespace='/ticker')
 def off_room(data):
-    leave_room(data['room'])
-    user_rooms[request.sid].remove(data['room'])
-    emit('log',
-         {'level': 'info', 'text': 'leave room [{}], rooms now: {}'.format(data['room'], user_rooms[request.sid])})
+    global subscribed_rooms
+    if data['room'] not in user_rooms[request.sid]:
+        emit('log', {'level': 'error', 'text': 'client not subscribe [{}]'.format(data['room'])})
+    else:
+        leave_room(data['room'])
+        user_rooms[request.sid].remove(data['room'])
+        subscribed_rooms[data['room']] -= 1
+        emit('log',
+             {'level': 'info', 'text': 'leave room [{}], rooms now: {}'.format(data['room'], user_rooms[request.sid])})
 
 
 if __name__ == '__main__':
-    sio.start_background_task(timer_ticker, sio)
+    Thread(target=subscribe_push, args=(sio,)).start()
     sio.run(app)
