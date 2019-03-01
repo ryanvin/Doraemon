@@ -2,6 +2,7 @@ import json
 import time
 from collections import defaultdict
 from threading import Thread
+from uuid import uuid4
 
 import eventlet
 from flask import Flask, render_template, request
@@ -12,11 +13,11 @@ eventlet.monkey_patch(socket=True)
 tickers = ['abc_usdt', 'def_usdt', 'ghi_btc']
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'fashdoi03whioealsd0q9ef0'
+app.config['SECRET_KEY'] = str(uuid4())
 sio = SocketIO(app)
 sio.init_app(app, async_mode='eventlet', message_queue='redis://127.0.0.1:6379')
 subscribed_rooms = defaultdict(int)
-valid_rooms = ('okex', 'huobi', 'binance')
+valid_rooms = (1201, 1202, 1203, 1204)
 sock_clients = dict()
 rds = StrictRedis.from_url('redis://127.0.0.1:6379')
 user_rooms = defaultdict(set)
@@ -32,10 +33,10 @@ def subscribe_push(sock):
             time.sleep(0.1)
             continue
         data = json.loads(message['data'], encoding='utf-8')
-        r_count = subscribed_rooms.copy().get(data['room'])
+        r_count = subscribed_rooms.copy().get(data['market_id'])
         if r_count and r_count > 0:
             sock.emit('ticker_response',
-                      {'data': data['payload'], 'room': data['room']}, room=data['room'], namespace='/ticker')
+                      {'data': data, 'room': data['market_id']}, room=data['market_id'], namespace='/ticker')
 
 
 @app.route('/')
@@ -55,6 +56,7 @@ def on_ping(_):
 
 @sio.on('join', namespace='/ticker')
 def on_room(data):
+    data['room'] = int(data['room'])
     global subscribed_rooms
     if data['room'] not in valid_rooms:
         emit('log', {'level': 'error', 'text': 'room [{}] not found'.format(data['room'])})
@@ -68,6 +70,7 @@ def on_room(data):
 
 @sio.on('leave', namespace='/ticker')
 def off_room(data):
+    data['room'] = int(data['room'])
     global subscribed_rooms
     if data['room'] not in user_rooms[request.sid]:
         emit('log', {'level': 'error', 'text': 'client not subscribe [{}]'.format(data['room'])})
