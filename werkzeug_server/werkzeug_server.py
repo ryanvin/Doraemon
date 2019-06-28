@@ -50,7 +50,7 @@ app = SampleServer('test')
 
 @app.route("/")
 def index():
-    return dict(name="ryan", date=time.ctime())
+    return dict(name="", date=time.ctime())
 
 
 @app.route("/test")
