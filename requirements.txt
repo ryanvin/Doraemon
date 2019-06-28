@@ -1,0 +1,4 @@
+jieba==0.39
+redis==3.2.1
+simhash==1.9.0
+zhon==1.1.5
