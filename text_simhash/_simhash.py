@@ -22,7 +22,7 @@ class TextHashChecker(object):
         self.threshold = threshold
         self.bit_block_size = bit_block_size
         self.redis = redis.StrictRedis.from_url(redis_url)
-        self.key_prefix = "text_hash:"
+        self.key_prefix = "text_simhash:"
 
     @staticmethod
     def calculate_hash(text: str) -> int:
@@ -36,13 +36,13 @@ class TextHashChecker(object):
 
     def save_split_hash(self, raw_hash: int):
         bit64 = f"{raw_hash:064b}"
-        split_bit = [bit64[i:i + 16] for i in range(0, 64, 16)]
+        split_bit = [bit64[i:i + self.bit_block_size] for i in range(0, 64, self.bit_block_size)]
         for b in split_bit:
             self.redis.sadd(f"{self.key_prefix}{b}", raw_hash)
 
     def cal_rds_hash(self, raw_hash: int):
         bit64 = f"{raw_hash:064b}"
-        split_bit = [bit64[i:i + 16] for i in range(0, 64, 16)]
+        split_bit = [bit64[i:i + self.bit_block_size] for i in range(0, 64, self.bit_block_size)]
         _hamming_distance = {self.threshold + 1}
         hash_all = set()
         for b in split_bit:
@@ -57,7 +57,7 @@ class TextHashChecker(object):
 
     def is_text_duplicated(self, text: str):
         is_duplicated = False
-        if self.cal_rds_hash(self.calculate_hash(text)) <= 3:
+        if self.cal_rds_hash(self.calculate_hash(text)) <= self.threshold:
             is_duplicated = True
         self.save_split_hash(self.calculate_hash(text))
         return is_duplicated

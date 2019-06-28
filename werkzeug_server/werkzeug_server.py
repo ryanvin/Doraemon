@@ -45,12 +45,12 @@ class SampleServer(object):
         return inner
 
 
-app = SampleServer('test')
+app = SampleServer('zhuozimu')
 
 
 @app.route("/")
 def index():
-    return dict(name="", date=time.ctime())
+    return dict(msg="welcome", date=time.ctime())
 
 
 @app.route("/test")
@@ -59,5 +59,5 @@ def test():
 
 
 if __name__ == '__main__':
-    """gunicorn -w 2 http_server:app"""
+    """gunicorn -w 2 werkzeug_server:app"""
     app.run()
